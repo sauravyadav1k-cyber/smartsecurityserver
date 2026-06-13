@@ -8,10 +8,8 @@ const app = express();
 const port = Number(process.env.PORT || 3000);
 const alertApiKey = process.env.ALERT_API_KEY;
 const requiredMailEnv = ["SMTP_HOST", "SMTP_USER", "SMTP_PASS"];
-const smtpPort = Number(process.env.SMTP_PORT || 465);
-const smtpSecure = process.env.SMTP_SECURE
-  ? String(process.env.SMTP_SECURE).toLowerCase() === "true"
-  : smtpPort === 465;
+const smtpPort = 587;
+const smtpSecure = false;
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -115,6 +113,7 @@ function createMailTransport() {
     host: process.env.SMTP_HOST,
     port: smtpPort,
     secure: smtpSecure,
+    requireTLS: !smtpSecure,
     family: 4,
     name: "smartsecurity-backend",
     connectionTimeout: 30000,
