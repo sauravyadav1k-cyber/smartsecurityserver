@@ -10,6 +10,10 @@ const app = express();
 const port = Number(process.env.PORT || 3000);
 const alertApiKey = process.env.ALERT_API_KEY;
 const requiredMailEnv = ["SMTP_HOST", "SMTP_USER", "SMTP_PASS"];
+const smtpPort = Number(process.env.SMTP_PORT || 465);
+const smtpSecure = process.env.SMTP_SECURE
+  ? String(process.env.SMTP_SECURE).toLowerCase() === "true"
+  : smtpPort === 465;
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -29,8 +33,11 @@ const upload = multer({
 
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
-  port: Number(process.env.SMTP_PORT || 465),
-  secure: String(process.env.SMTP_SECURE).toLowerCase() === "true",
+  port: smtpPort,
+  secure: smtpSecure,
+  connectionTimeout: 30000,
+  greetingTimeout: 30000,
+  socketTimeout: 60000,
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS
@@ -92,7 +99,11 @@ app.post("/api/security-alert", upload.array("attachments", 5), async (request, 
     response.json({ ok: true, sent: true, attachments: files.length });
   } catch (error) {
     console.error(error);
-    response.status(500).json({ error: "Failed to send alert email" });
+    response.status(500).json({
+      error: "Failed to send alert email",
+      code: error.code || "EMAIL_SEND_FAILED",
+      detail: safeErrorMessage(error)
+    });
   }
 });
 
@@ -111,4 +122,11 @@ function extensionFor(mimetype) {
 
 function missingMailEnv() {
   return requiredMailEnv.filter((name) => !process.env[name]);
+}
+
+function safeErrorMessage(error) {
+  const message = String(error && error.message ? error.message : "");
+  return message
+    .replace(String(process.env.SMTP_PASS || ""), "[hidden]")
+    .replace(String(process.env.ALERT_API_KEY || ""), "[hidden]");
 }
