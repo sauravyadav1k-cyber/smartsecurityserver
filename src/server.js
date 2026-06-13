@@ -29,43 +29,6 @@ const upload = multer({
   }
 });
 
-const transporter = createMailTransport({
-  host: process.env.SMTP_HOST,
-  port: smtpPort,
-  secure: smtpSecure
-});
-
-const fallbackTransporter = createMailTransport({
-  host: process.env.SMTP_HOST,
-  port: 587,
-  secure: false
-});
-
-function createMailTransport({ host, port, secure }) {
-  return nodemailer.createTransport({
-    host,
-    port,
-    secure,
-    requireTLS: !secure,
-    family: 4,
-    name: "smartsecurity-backend",
-    tls: {
-      minVersion: "TLSv1.2"
-    },
-    connectionTimeout: 30000,
-    greetingTimeout: 30000,
-    socketTimeout: 60000,
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS
-    }
-  });
-}
-
-const mailOptionsBase = {
-  from: process.env.SMTP_FROM || process.env.SMTP_USER
-};
-
 app.use(cors());
 app.use(express.json());
 
@@ -106,8 +69,9 @@ app.post("/api/security-alert", upload.array("attachments", 5), async (request, 
       return;
     }
 
-    const mailOptions = {
-      ...mailOptionsBase,
+    const transporter = createMailTransport();
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
       to,
       subject,
       text,
@@ -116,9 +80,7 @@ app.post("/api/security-alert", upload.array("attachments", 5), async (request, 
         content: file.buffer,
         contentType: file.mimetype
       }))
-    };
-
-    await sendMailWithFallback(mailOptions);
+    });
 
     response.json({ ok: true, sent: true, attachments: files.length });
   } catch (error) {
@@ -148,21 +110,21 @@ function missingMailEnv() {
   return requiredMailEnv.filter((name) => !process.env[name]);
 }
 
-async function sendMailWithFallback(mailOptions) {
-  try {
-    await transporter.sendMail(mailOptions);
-  } catch (error) {
-    if (!shouldTryFallback(error)) {
-      throw error;
+function createMailTransport() {
+  return nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: smtpPort,
+    secure: smtpSecure,
+    family: 4,
+    name: "smartsecurity-backend",
+    connectionTimeout: 30000,
+    greetingTimeout: 30000,
+    socketTimeout: 60000,
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS
     }
-
-    console.warn(`Primary SMTP failed (${error.code || error.message}); trying Gmail STARTTLS fallback`);
-    await fallbackTransporter.sendMail(mailOptions);
-  }
-}
-
-function shouldTryFallback(error) {
-  return ["ETIMEDOUT", "ECONNECTION", "ESOCKET"].includes(error.code);
+  });
 }
 
 function safeErrorMessage(error) {
