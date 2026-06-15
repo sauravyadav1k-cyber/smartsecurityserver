@@ -4,12 +4,11 @@ const cors = require("cors");
 const express = require("express");
 const multer = require("multer");
 const nodemailer = require("nodemailer");
+
 const app = express();
 const port = Number(process.env.PORT || 3000);
 const alertApiKey = process.env.ALERT_API_KEY;
 const requiredMailEnv = ["SMTP_HOST", "SMTP_USER", "SMTP_PASS"];
-const smtpPort = 587;
-const smtpSecure = false;
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -30,12 +29,25 @@ const upload = multer({
 app.use(cors());
 app.use(express.json());
 
-app.get("/health", (_request, response) => {
-  response.json({
+app.get("/health", async (_request, response) => {
+  const missing = missingMailEnv();
+  const payload = {
     ok: true,
     service: "smartsecurity-backend",
-    mailConfigured: missingMailEnv().length === 0
-  });
+    mailConfigured: missing.length === 0
+  };
+
+  if (missing.length === 0) {
+    try {
+      await createMailTransport().verify();
+      payload.smtpVerified = true;
+    } catch (error) {
+      payload.smtpVerified = false;
+      payload.smtpError = safeErrorMessage(error);
+    }
+  }
+
+  response.json(payload);
 });
 
 app.post("/api/security-alert", upload.array("attachments", 5), async (request, response) => {
@@ -97,6 +109,7 @@ app.use((error, _request, response, _next) => {
 
 app.listen(port, () => {
   console.log(`SmartSecurity backend running on http://localhost:${port}`);
+  logStartupStatus();
 });
 
 function extensionFor(mimetype) {
@@ -109,13 +122,15 @@ function missingMailEnv() {
 }
 
 function createMailTransport() {
+  const smtpPort = Number(process.env.SMTP_PORT || 587);
+  const smtpSecure = String(process.env.SMTP_SECURE || "false").toLowerCase() === "true";
+
   return nodemailer.createTransport({
     host: process.env.SMTP_HOST,
     port: smtpPort,
     secure: smtpSecure,
     requireTLS: !smtpSecure,
     family: 4,
-    name: "smartsecurity-backend",
     connectionTimeout: 30000,
     greetingTimeout: 30000,
     socketTimeout: 60000,
@@ -131,4 +146,24 @@ function safeErrorMessage(error) {
   return message
     .replace(String(process.env.SMTP_PASS || ""), "[hidden]")
     .replace(String(process.env.ALERT_API_KEY || ""), "[hidden]");
+}
+
+async function logStartupStatus() {
+  const missing = missingMailEnv();
+  if (missing.length > 0) {
+    console.warn(`Missing mail environment variables: ${missing.join(", ")}`);
+    return;
+  }
+
+  if (!alertApiKey) {
+    console.warn("ALERT_API_KEY is not set. Alert uploads will be rejected.");
+    return;
+  }
+
+  try {
+    await createMailTransport().verify();
+    console.log("SMTP connection verified.");
+  } catch (error) {
+    console.error("SMTP verification failed:", safeErrorMessage(error));
+  }
 }

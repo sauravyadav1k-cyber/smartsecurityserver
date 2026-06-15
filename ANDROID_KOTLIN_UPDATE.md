@@ -8,14 +8,14 @@ For Android emulator:
 
 ```kotlin
 private val backendUrl = "http://10.0.2.2:3000/api/security-alert"
-private val backendApiKey = "change-this-secret-key"
+private val backendApiKey = "\$sauravyadav123"
 ```
 
 For real phone testing, replace `10.0.2.2` with your computer's Wi-Fi IP address:
 
 ```kotlin
 private val backendUrl = "http://YOUR_COMPUTER_IP:3000/api/security-alert"
-private val backendApiKey = "change-this-secret-key"
+private val backendApiKey = "\$sauravyadav123"
 ```
 
 The `backendApiKey` must match `ALERT_API_KEY` in the backend `.env` file.
@@ -23,15 +23,15 @@ The `backendApiKey` must match `ALERT_API_KEY` in the backend `.env` file.
 For the online hosted backend, use your HTTPS service URL:
 
 ```kotlin
-private val backendUrl = "https://YOUR-HOST-NAME/api/security-alert"
-private val backendApiKey = "same-value-as-hosted-ALERT_API_KEY"
+private val backendUrl = "https://smartsecurity-backend-onzu.onrender.com/api/security-alert"
+private val backendApiKey = "\$sauravyadav123"
 ```
 
 ## Replace Your Email Sending Function
 
 ```kotlin
 private val backendUrl = "http://10.0.2.2:3000/api/security-alert"
-private val backendApiKey = "change-this-secret-key"
+private val backendApiKey = "\$sauravyadav123"
 
 private fun sendPhotosByEmail(email: String, photos: List<File>) {
     val client = OkHttpClient()
